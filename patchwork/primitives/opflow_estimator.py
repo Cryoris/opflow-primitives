@@ -114,11 +114,19 @@ class OpflowEstimator(BaseEstimator):
         values = [None] * num_results
         metadata = [None] * num_results
         for _, (expectation, parameters, indices, values_list) in grouped.items():
-            transposed = np.array(values_list).T.tolist()
-            param_dict = dict(zip(parameters, transposed))
+            if len(parameters) == 0:
+                param_dict = None
+            else:
+                transposed = np.array(values_list).T.tolist()
+                param_dict = dict(zip(parameters, transposed))
+
             sampled = self.sampler.convert(expectation, params=param_dict)
             std = self.expectation_converter.compute_variance(sampled)
             value = sampled.eval()
+            if not isinstance(value, list):
+                value = [value]
+            if not isinstance(std, list):
+                std = [std]
 
             for i, value_i, std_i in zip(indices, value, std):
                 values[i] = value_i
