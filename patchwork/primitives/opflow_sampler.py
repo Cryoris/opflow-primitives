@@ -15,7 +15,14 @@ from qiskit.quantum_info import SparsePauliOp
 from qiskit.quantum_info.operators.base_operator import BaseOperator
 from qiskit.providers import Backend
 from qiskit.providers import JobV1 as Job
-from qiskit.opflow import CircuitSampler, StateFn, ExpectationBase, PauliSumOp, PrimitiveOp, ListOp
+from qiskit.opflow import (
+    CircuitSampler,
+    StateFn,
+    ExpectationBase,
+    PauliSumOp,
+    PrimitiveOp,
+    ListOp,
+)
 from qiskit.utils import QuantumInstance
 
 from qiskit.primitives import BaseSampler, SamplerResult
@@ -63,6 +70,7 @@ class OpflowSampler(BaseSampler):
             backend = QuantumInstance(backend)
 
         self.sampler = CircuitSampler(backend)
+        self._circuit_cache = {}  # circuits but w/o measurements
 
     def _run(
         self,
@@ -73,13 +81,18 @@ class OpflowSampler(BaseSampler):
         to_sample = {}
 
         for i, circuit in enumerate(circuits):
-            circuit.remove_final_measurements()
             key = _circuit_key(circuit)
+
+            if key not in self._circuit_cache.keys():
+                self._circuit_cache[key] = circuit.remove_final_measurements(
+                    inplace=False
+                )
+            measureless_circuit = self._circuit_cache[key]
 
             # generate a dictionary with the expectation as key,
             # and as value a tuple of (parameters, [index1, index2, ...], [values1, values2, ...])
             if key not in to_sample.keys():
-                to_sample[key] = (circuit, [i], [parameter_values[i]])
+                to_sample[key] = (measureless_circuit, [i], [parameter_values[i]])
             else:
                 to_sample[key][1].append(i)
                 to_sample[key][2].append(parameter_values[i])

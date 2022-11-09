@@ -15,7 +15,14 @@ from qiskit.quantum_info import SparsePauliOp
 from qiskit.quantum_info.operators.base_operator import BaseOperator
 from qiskit.providers import Backend
 from qiskit.providers import JobV1 as Job
-from qiskit.opflow import CircuitSampler, StateFn, ExpectationBase, PauliSumOp, PrimitiveOp, ListOp
+from qiskit.opflow import (
+    CircuitSampler,
+    StateFn,
+    ExpectationBase,
+    PauliSumOp,
+    PrimitiveOp,
+    ListOp,
+)
 from qiskit.utils import QuantumInstance
 
 from qiskit.primitives import BaseEstimator, EstimatorResult
@@ -100,7 +107,12 @@ class OpflowEstimator(BaseEstimator):
             # generate a dictionary with the expectation as key,
             # and as value a tuple of (parameters, [index1, index2, ...], [values1, values2, ...])
             if key not in expectations.keys():
-                expectations[key] = (exp, circuit.parameters, [i], [parameter_values[i]])
+                expectations[key] = (
+                    exp,
+                    circuit.parameters,
+                    [i],
+                    [parameter_values[i]],
+                )
             else:
                 expectations[key][2].append(i)
                 expectations[key][3].append(parameter_values[i])
@@ -111,7 +123,7 @@ class OpflowEstimator(BaseEstimator):
         return job
 
     def _evaluate(self, grouped, num_results) -> EstimatorResult:
-        values = [None] * num_results
+        values = np.empty(num_results, dtype=complex)
         metadata = [None] * num_results
         for _, (expectation, parameters, indices, values_list) in grouped.items():
             if len(parameters) == 0:
@@ -125,7 +137,6 @@ class OpflowEstimator(BaseEstimator):
             value = sampled.eval()
             if not isinstance(value, list):
                 value = [value]
-            if not isinstance(std, list):
                 std = [std]
 
             for i, value_i, std_i in zip(indices, value, std):
