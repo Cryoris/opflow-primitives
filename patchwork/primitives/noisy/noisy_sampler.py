@@ -23,14 +23,11 @@ class NoisySampler(Sampler):
         shots = self.options.get("shots", None)
 
         # remove 0 probabilities
-        to_remove = []
-        for dist in result.quasi_dists:
-            for key, prob in dist.items():
-                if prob == 0:
-                    to_remove.append(key)
-
-        for key in to_remove:
-            dist.pop(key)
+        # to_remove = []
+        # for dist in result.quasi_dists:
+        #     for key, prob in dist.items():
+        #         if prob == 0:
+        #             to_remove.append(key)
 
         if shots is None:
             print("To add noise, set a finite number of shots.")

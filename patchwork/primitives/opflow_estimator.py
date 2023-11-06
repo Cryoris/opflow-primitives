@@ -45,6 +45,7 @@ class OpflowEstimator(BaseEstimator):
         options: dict | None = None,
         expectation_converter: ExpectationBase | None = None,
         backend: QuantumInstance | Backend | None = None,
+        uses_same_parameters: bool = False,
     ) -> None:
         """
         Args:
@@ -77,9 +78,12 @@ class OpflowEstimator(BaseEstimator):
         if not isinstance(backend, QuantumInstance):
             backend = QuantumInstance(backend)
 
-        self.sampler = CircuitSampler(backend)
+        self.sampler = CircuitSampler(backend, caching="all", param_qobj=True)
+
+        self._uses_same_parameters = uses_same_parameters
 
         self._expectation_cache = {}
+        self._counts = {"hit": 0, "miss": 0}
 
     def _run(
         self,
@@ -98,14 +102,17 @@ class OpflowEstimator(BaseEstimator):
 
             # it if did not exist, build it
             if exp is None:
+                self._counts["miss"] += 1
                 if not isinstance(observable, PauliSumOp):
                     observable = PrimitiveOp(observable)
                 exp = StateFn(observable, is_measurement=True).compose(StateFn(circuit))
                 exp = self.expectation_converter.convert(exp)
                 self._expectation_cache[key] = exp
+            else:
+                self._counts["hit"] += 1
 
-            # generate a dictionary with the expectation as key,
-            # and as value a tuple of (parameters, [index1, index2, ...], [values1, values2, ...])
+            # generate a dictionary with the key, and as value a tuple of
+            # (expectation, parameters, [index1, index2, ...], [values1, values2, ...])
             if key not in expectations.keys():
                 expectations[key] = (
                     exp,
@@ -122,6 +129,20 @@ class OpflowEstimator(BaseEstimator):
 
         return job
 
+    # def _evalute_same_params(self, grouped, num_results) -> EstimatorResult:
+    #     ops = []
+    #     indices = []
+    #     values = []
+    #     parameters = None
+
+    #     for i, (expectation, params, _, values_list) in enumerate(grouped.values()):
+    #         if i == 0:
+    #             parameters = params
+
+    #         ops.append(expectation)
+    #         indices.append()
+    #     list_op = ListOp([expectations] for expectations, _, _, _ in grouped.items())
+
     def _evaluate(self, grouped, num_results) -> EstimatorResult:
         values = np.empty(num_results, dtype=complex)
         metadata = [None] * num_results
@@ -133,15 +154,16 @@ class OpflowEstimator(BaseEstimator):
                 param_dict = dict(zip(parameters, transposed))
 
             sampled = self.sampler.convert(expectation, params=param_dict)
-            std = self.expectation_converter.compute_variance(sampled)
+            # std = self.expectation_converter.compute_variance(sampled)
             value = sampled.eval()
             if not isinstance(value, list):
                 value = [value]
-                std = [std]
+                # std = [std]
 
-            for i, value_i, std_i in zip(indices, value, std):
+            # for i, value_i, std_i in zip(indices, value, std):
+            for i, value_i in zip(indices, value):
                 values[i] = value_i
-                metadata[i] = {"std": std_i}
+                # metadata[i] = {"std": std_i}
 
         result = EstimatorResult(values, metadata=metadata)
         return result
